@@ -1,0 +1,68 @@
+- hosts: webservers
+  gather_facts: yes
+  become_user: root
+
+  tasks:
+    - name: Update and upgrade apt packages
+      apt:
+        update_cache: yes
+        force_apt_get: yes
+        upgrade: yes
+
+    - name: Check if Curl is already installed
+      shell: dpkg -s curl | grep status
+      register: curl_is_installed
+      failed_when: no
+
+    - name: install curl if not installed already
+      apt:
+        name: curl
+        state: present
+        update_cache: true
+      when: curl_is_installed.rc == 1
+
+    # - name: install curl if not installed already
+    #   apt: pkg=curl state=present
+    #   when: curl_is_installed.rc == 1
+
+    - name: Check if Kubernetes is already installed
+      shell: dpkg -s kubectl | grep status
+      register: kubectl_is_installed
+    #   failed_when: no
+
+    - block:
+        - name: add kubernetes signing key
+          apt_key:
+            url: https://packages.cloud.google.com/apt/doc/apt-key.gpg
+            state: present
+
+        - name: add kubernetes API repository
+          apt_repository:
+            repo: deb http://apt.kubernetes.io/ kubernetes-xenial main
+            state: present
+            filename: "kubernetes"
+
+        - name: install kubelet
+          apt:
+            name: kubelet
+            state: present
+            update_cache: true
+
+        - name: install kubeadm
+          apt:
+            name: kubeadm
+            state: present
+            update_cache: true
+
+        - name: install kubectl
+          apt:
+            name: kubectl
+            state: present
+            update_cache: true
+
+        - name: Hold kubernetes packages
+          dpkg_selections:
+            name: kubectl
+            selection: hold
+      when: kubectl_is_installed.rc == 1
+
